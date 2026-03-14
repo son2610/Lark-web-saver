@@ -21,6 +21,7 @@ function init() {
     btnSendBot: $('btn-send-bot'),
     btnSettings: $('btn-settings'),
     statusBar: $('status-bar'),
+    statusText: $('status-text'),
     groupCheckboxes: $('group-checkboxes'),
     checkAllGroups: $('check-all-groups'),
     ratingStars: $('rating-stars'),
@@ -160,7 +161,7 @@ async function getSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
       ['appToken', 'tableId', 'appId', 'appSecret', 'signSecret',
-       'cachedTenantToken', 'cachedTokenExpiry', 'webhooks'],
+       'cachedTenantToken', 'cachedTokenExpiry', 'webhooks', 'sysUserId'],
       (data) => resolve(data)
     );
   });
