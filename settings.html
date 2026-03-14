@@ -45,6 +45,15 @@
 
       <div class="field-group">
         <div class="field">
+          <label class="field-label" for="setting-sys-user-id">
+            System User ID
+            <span class="badge-optional" style="background: rgba(51, 112, 255, 0.15); color: var(--primary);">Auto-generated</span>
+          </label>
+          <input type="text" id="setting-sys-user-id" class="field-input" readonly>
+          <span class="field-hint">Unique identity sent to Base to identify who saved this page</span>
+        </div>
+
+        <div class="field">
           <label class="field-label" for="setting-app-token">App Token</label>
           <input type="text" id="setting-app-token" class="field-input" placeholder="appbcbWCzen6D8dezhoCH2RpMAh">
           <span class="field-hint">Found in the Base URL after /base/</span>
@@ -164,6 +173,8 @@
             <tr><td>URL</td><td>🔗 URL</td></tr>
             <tr><td>Description</td><td>📝 Text</td></tr>
             <tr><td>Tags</td><td>🏷️ Single Select</td></tr>
+            <tr><td>Rating</td><td>🔢 Number</td></tr>
+            <tr><td>User ID</td><td>📝 Text</td></tr>
             <tr><td>Notes</td><td>📝 Text</td></tr>
             <tr><td>Saved At</td><td>📅 Date</td></tr>
           </tbody>

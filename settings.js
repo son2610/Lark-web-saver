@@ -38,8 +38,15 @@ function toggleVisibility(inputId) {
 // ===================== LOAD =====================
 function loadSettings() {
   chrome.storage.local.get(
-    ['appToken', 'tableId', 'appId', 'appSecret', 'signSecret', 'customTags', 'webhooks'],
+    ['appToken', 'tableId', 'appId', 'appSecret', 'signSecret', 'customTags', 'webhooks', 'sysUserId'],
     (data) => {
+      let sysUserId = data.sysUserId;
+      if (!sysUserId) {
+        sysUserId = 'user_' + Math.random().toString(36).substr(2, 9);
+        chrome.storage.local.set({ sysUserId });
+      }
+
+      $('setting-sys-user-id').value = sysUserId;
       $('setting-app-token').value = data.appToken || '';
       $('setting-table-id').value = data.tableId || '';
       $('setting-app-id').value = data.appId || '';

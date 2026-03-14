@@ -7,7 +7,9 @@
     "activeTab",
     "scripting",
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "alarms",
+    "notifications"
   ],
   "action": {
     "default_popup": "popup.html",

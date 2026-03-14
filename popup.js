@@ -21,9 +21,17 @@ function init() {
     btnSendBot: $('btn-send-bot'),
     btnSettings: $('btn-settings'),
     statusBar: $('status-bar'),
-    statusText: $('status-text'),
     groupCheckboxes: $('group-checkboxes'),
     checkAllGroups: $('check-all-groups'),
+    ratingStars: $('rating-stars'),
+    ratingValue: 0,
+    
+    // Reviews
+    btnReviews: $('btn-reviews'),
+    reviewBadge: $('review-badge'),
+    reviewsView: $('reviews-view'),
+    reviewsList: $('reviews-list'),
+    formView: document.querySelector('.form'),
   };
 
   // Load current tab info (or pending page from context menu)
@@ -42,11 +50,32 @@ function init() {
     chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
   });
 
+  els.btnReviews.addEventListener('click', toggleReviewsView);
+
+  // Load pending reviews
+  loadDueReviews();
+
   // Select All toggle
   els.checkAllGroups.addEventListener('change', () => {
     const checked = els.checkAllGroups.checked;
     const boxes = els.groupCheckboxes.querySelectorAll('input[type="checkbox"]');
     boxes.forEach((cb) => { cb.checked = checked; });
+  });
+
+  // Star Rating Interaction
+  const stars = document.querySelectorAll('.star');
+  stars.forEach(star => {
+    star.addEventListener('mouseover', () => {
+      const val = parseInt(star.dataset.val);
+      stars.forEach(s => s.classList.toggle('hover', parseInt(s.dataset.val) <= val));
+    });
+    star.addEventListener('mouseout', () => {
+      stars.forEach(s => s.classList.remove('hover'));
+    });
+    star.addEventListener('click', () => {
+      els.ratingValue = parseInt(star.dataset.val);
+      stars.forEach(s => s.classList.toggle('active', parseInt(s.dataset.val) <= els.ratingValue));
+    });
   });
 }
 
@@ -208,10 +237,15 @@ async function handleSaveToBase() {
       'Description': description || '',
       'Notes': notes || '',
       'Saved At': Date.now(),
+      'User ID': settings.sysUserId || 'Unknown'
     };
 
     if (tags) {
       fields['Tags'] = tags;
+    }
+    
+    if (els.ratingValue > 0) {
+      fields['Rating'] = els.ratingValue;
     }
 
     const apiUrl = `https://open.larksuite.com/open-apis/bitable/v1/apps/${settings.appToken}/tables/${settings.tableId}/records`;
@@ -229,6 +263,10 @@ async function handleSaveToBase() {
 
     if (result.code === 0) {
       showStatus('success', '✅ Saved to Lark Base successfully!');
+      
+      // Save to Forgetting Curve review queue
+      queueForReview(url, title);
+      
     } else {
       showStatus('error', `❌ Error: ${result.msg || 'Unknown error'}`);
       console.error('Lark Base API error:', result);
@@ -276,6 +314,8 @@ async function handleSendToBot() {
     let contentParts = [];
     contentParts.push(`**📄 ${title}**`);
     if (tags) contentParts.push(`🏷️ Tag: **${tags}**`);
+    if (els.ratingValue > 0) contentParts.push(`⭐ Rating: **${els.ratingValue}/5**`);
+    contentParts.push(`👤 User: **${settings.sysUserId || 'Unknown'}**`);
     if (description) contentParts.push(`📝 ${description}`);
     if (notes) contentParts.push(`💬 _${notes}_`);
 
@@ -382,4 +422,114 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ===================== REVIEWS & FORGETTING CURVE =====================
+const REVIEW_INTERVALS_DAYS = [30, 90, 180, 365];
+
+function toggleReviewsView() {
+  const isHidden = els.reviewsView.classList.contains('hidden');
+  if (isHidden) {
+    els.formView.style.display = 'none';
+    els.reviewsView.classList.remove('hidden');
+    loadDueReviews();
+  } else {
+    els.formView.style.display = 'flex';
+    els.reviewsView.classList.add('hidden');
+  }
+}
+
+function queueForReview(url, title) {
+  chrome.storage.local.get(['review_queue'], (data) => {
+    const queue = data.review_queue || [];
+    // Only queue if not already there to prevent duplicates
+    if (!queue.find(q => q.url === url)) {
+      queue.push({
+        url: url,
+        title: title,
+        savedAt: Date.now(),
+        reviewLevel: 0
+      });
+      chrome.storage.local.set({ review_queue: queue }, () => {
+        loadDueReviews();
+      });
+    }
+  });
+}
+
+function loadDueReviews() {
+  chrome.storage.local.get(['review_queue'], (data) => {
+    const queue = data.review_queue || [];
+    const now = Date.now();
+    
+    // Find due items
+    const dueItems = queue.filter(item => {
+      const level = item.reviewLevel || 0;
+      if (level >= REVIEW_INTERVALS_DAYS.length) return false;
+      const daysToWait = REVIEW_INTERVALS_DAYS[level];
+      const dueDate = item.savedAt + (daysToWait * 24 * 60 * 60 * 1000);
+      return now >= dueDate;
+    });
+
+    // Update Badge
+    if (dueItems.length > 0) {
+      els.reviewBadge.classList.remove('hidden');
+    } else {
+      els.reviewBadge.classList.add('hidden');
+    }
+
+    // Render list
+    els.reviewsList.innerHTML = '';
+    
+    if (dueItems.length === 0) {
+      els.reviewsList.innerHTML = `<div class="empty-reviews">🎉 All caught up! No pages due for review today.</div>`;
+      return;
+    }
+
+    dueItems.forEach(item => {
+      const indexInQueue = queue.findIndex(q => q.url === item.url);
+      
+      const el = document.createElement('div');
+      el.className = 'review-item';
+      
+      const nextLevelStr = `Level ${item.reviewLevel + 1}/${REVIEW_INTERVALS_DAYS.length}`;
+      
+      el.innerHTML = `
+        <div class="review-meta">
+          <span>${new Date(item.savedAt).toLocaleDateString()}</span>
+          <span class="level">${nextLevelStr}</span>
+        </div>
+        <div class="review-info">${escapeHtml(item.title)}</div>
+        <div class="review-actions">
+          <button class="btn-review-act done" data-idx="${indexInQueue}" data-url="${escapeAttr(item.url)}">
+            📖 Review Now
+          </button>
+          <button class="btn-review-act skip" data-idx="${indexInQueue}">
+            ⏭ Skip
+          </button>
+        </div>
+      `;
+      els.reviewsList.appendChild(el);
+    });
+
+    // Setup action listeners
+    const actionBtns = els.reviewsList.querySelectorAll('.btn-review-act');
+    actionBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const isSkip = btn.classList.contains('skip');
+        const idx = parseInt(btn.dataset.idx);
+        
+        if (!isSkip) {
+          // Open URL to review
+          chrome.tabs.create({ url: btn.dataset.url, active: false });
+        }
+        
+        // Bump level
+        queue[idx].reviewLevel = (queue[idx].reviewLevel || 0) + 1;
+        chrome.storage.local.set({ review_queue: queue }, () => {
+          loadDueReviews();
+        });
+      });
+    });
+  });
 }
