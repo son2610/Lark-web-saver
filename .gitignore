@@ -1,0 +1,16 @@
+# Documentation
+Docs/
+*.md
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Any zip/build files that might be created later
+*.zip
+*.crx
